@@ -1,0 +1,11 @@
+# Global values are visible to every subchart as .Values.global.*
+global:
+  domain: home.lan
+  storageClass: local-path   # k3s default; data lands on the RAID, see docs
+
+# One block per subchart. Each is toggled by its `enabled` flag
+# (matched by `condition:` in Chart.yaml) and passes the rest to the subchart.
+whoami:
+  enabled: true
+  ingress:
+    host: whoami.home.lan

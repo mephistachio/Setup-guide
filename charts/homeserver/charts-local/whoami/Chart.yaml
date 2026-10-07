@@ -1,0 +1,6 @@
+apiVersion: v2
+name: whoami
+description: Tiny HTTP echo service used to smoke-test the cluster
+type: application
+version: 0.1.0
+appVersion: "1.10.3"

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: homeserver
+description: Umbrella ("chart of charts") that installs every service running on the homeserver
+type: application
+version: 0.1.0
+dependencies:
+  # Local sample app, proves the whole chain (ingress, DNS, storage) works.
+  - name: whoami
+    version: 0.1.0
+    repository: file://charts-local/whoami
+    condition: whoami.enabled
+
+  # Examples of third-party charts. Uncomment, then run `helm dependency update`.
+  # - name: cert-manager
+  #   version: v1.16.2
+  #   repository: https://charts.jetstack.io
+  #   condition: cert-manager.enabled
+  # - name: nextcloud
+  #   version: 6.5.0
+  #   repository: https://nextcloud.github.io/helm
+  #   condition: nextcloud.enabled
