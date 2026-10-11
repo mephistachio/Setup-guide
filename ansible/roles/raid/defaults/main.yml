@@ -1,0 +1,13 @@
+raid_device: /dev/md0
+raid_level: 5
+# /dev/disk/by-id/... paths. Empty = no array, /srv/data stays on the root disk.
+raid_devices: []
+# Creating the array wipes raid_devices; must be set explicitly.
+raid_create_confirm: false
+raid_label: data
+raid_mailaddr: root
+data_root: /srv/data
+data_dirs:
+  - k3s-storage
+  - backups
+  - media

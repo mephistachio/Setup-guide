@@ -1,0 +1,17 @@
+# Pin a release (e.g. v1.33.4+k3s1) or leave empty to follow k3s_channel.
+k3s_version: ""
+k3s_channel: stable
+# Re-run the installer even if k3s is present (upgrades to k3s_version / channel).
+k3s_upgrade: false
+k3s_storage_path: "{{ data_root | default('/srv/data') }}/k3s-storage"
+k3s_tls_san:
+  - "{{ server_hostname }}"
+  - "{{ server_hostname }}.{{ domain }}"
+
+# Drain the node before k3s stops (e.g. on shutdown) so pods get SIGTERM
+# instead of being killed with the host; uncordon it when k3s starts.
+# https://oranki.net/posts/2025-01-09-graceful-k3s-shutdown/
+k3s_graceful_shutdown: true
+k3s_node_name: "{{ server_hostname }}"
+# Upper bound for the drain, so a stuck eviction can't block shutdown forever.
+k3s_drain_timeout: 300

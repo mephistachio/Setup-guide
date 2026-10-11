@@ -1,2 +1,3 @@
 charts/homeserver/charts/
 *.tgz
+ansible/collections/

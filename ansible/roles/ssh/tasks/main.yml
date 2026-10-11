@@ -1,0 +1,29 @@
+- name: Look for the admin user's authorized_keys
+  ansible.builtin.stat:
+    path: "~{{ admin_user }}/.ssh/authorized_keys"
+  register: ssh_authorized_keys
+
+- name: Refuse to disable passwords without an authorized key
+  ansible.builtin.assert:
+    that: ssh_authorized_keys.stat.exists and ssh_authorized_keys.stat.size > 0
+    fail_msg: >-
+      ~{{ admin_user }}/.ssh/authorized_keys is missing or empty. Run
+      `ssh-copy-id {{ admin_user }}@{{ server_hostname }}` from your workstation first,
+      or set ssh_disable_password_auth=false.
+  when: ssh_disable_password_auth
+
+- name: Harden sshd
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    mode: "0644"
+    content: |
+      PasswordAuthentication {{ 'no' if ssh_disable_password_auth else 'yes' }}
+      PermitRootLogin no
+    validate: sshd -t -f %s
+  register: ssh_config
+
+- name: Enable and reload sshd
+  ansible.builtin.systemd_service:
+    name: ssh
+    enabled: true
+    state: "{{ 'reloaded' if ssh_config is changed else 'started' }}"

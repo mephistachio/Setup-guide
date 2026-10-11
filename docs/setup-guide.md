@@ -4,6 +4,34 @@ Target: an old ThinkPad, clean Debian install, USB drive bay with up to four dis
 
 Commands run as root (`sudo -i`) unless noted.
 
+## 0. Automated setup with Ansible
+
+Sections 2–5 are automated by the playbook in [ansible/](../ansible), which configures the machine it runs on (`localhost`). The manual commands below stay as reference for what it does. Run from the repo root (`ansible.cfg` points Ansible at `ansible/`):
+
+```sh
+sudo apt install -y ansible
+ansible-galaxy collection install -r ansible/requirements.yml
+ansible-playbook ansible/playbooks/site.yml -K            # everything
+ansible-playbook ansible/playbooks/site.yml -K --tags k3s # one part
+```
+
+Settings live in [ansible/inventory/group_vars/homeserver.yml](../ansible/inventory/group_vars/homeserver.yml); every role's tunables are in `ansible/roles/<role>/defaults/main.yml`.
+
+| Tag | Role | Guide section |
+|---|---|---|
+| `base` | packages, hostname, `/etc/hosts`, unattended-upgrades, panic reboot | 2, 2.2, 2.3, 4.2 (local only) |
+| `power` | mask sleep, logind lid/keys, kernel cmdline (`consoleblank`, USB autosuspend, UAS quirks), no resume, battery thresholds | 1 (thresholds), 2.1, 3.1 |
+| `ssh` | key-only SSH, no root login. Fails if `~/.ssh/authorized_keys` is empty | 2.4 |
+| `firewall` | ufw rules | 2.5 |
+| `raid` | create array (opt-in), ext4, fstab with `nofail`, mdadm.conf, alerts, smartd, data dirs | 3.2–3.5 |
+| `k3s` | config, wait-for-mount drop-in, install, graceful shutdown (`k3s-shutdown@<node>.service` drains the node before k3s stops) | 4 |
+| `helm` | helm binary, `KUBECONFIG` in `/etc/profile.d` | 4.1 |
+| `chart` | `helm upgrade --install homeserver` | 5.1 |
+
+The RAID is only built when `raid_devices` lists the `/dev/disk/by-id/...` paths, and since that wipes the disks it also needs `-e raid_create_confirm=true`. Without disks, `/srv/data` is a plain directory on the root disk.
+
+Still manual: BIOS settings (section 1, except battery thresholds), the power-loss test, DNS on the router, a mail relay for mdadm alerts, replacing failed disks, and backups. Reboot after the first run so the kernel command line and logind settings take effect.
+
 ## 1. BIOS / firmware
 
 Enter setup with **F1** (or Enter, then F1) at the ThinkPad logo.

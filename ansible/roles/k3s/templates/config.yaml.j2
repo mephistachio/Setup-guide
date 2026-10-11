@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+write-kubeconfig-mode: "0640"
+write-kubeconfig-group: "sudo"
+default-local-storage-path: {{ k3s_storage_path }}
+tls-san:
+{% for san in k3s_tls_san %}
+  - {{ san }}
+{% endfor %}

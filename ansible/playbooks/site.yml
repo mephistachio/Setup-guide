@@ -1,0 +1,39 @@
+# Configures this machine as the homeserver, see docs/setup-guide.md.
+#   ansible-galaxy collection install -r ansible/requirements.yml
+#   ansible-playbook ansible/playbooks/site.yml -K
+# Run parts with --tags, e.g. --tags k3s,chart
+- name: Configure homeserver
+  hosts: homeserver
+  become: true
+
+  roles:
+    - { role: base, tags: [base] }
+    - { role: power, tags: [power] }
+    - { role: ssh, tags: [ssh] }
+    - { role: firewall, tags: [firewall] }
+    - { role: raid, tags: [raid] }
+    - { role: k3s, tags: [k3s] }
+    - { role: helm, tags: [helm] }
+    - { role: homeserver_chart, tags: [chart] }
+
+  handlers:
+    - name: Update grub
+      ansible.builtin.command: update-grub
+      changed_when: true
+      notify: Reboot required
+
+    - name: Update initramfs
+      ansible.builtin.command: update-initramfs -u
+      changed_when: true
+      notify: Reboot required
+
+    - name: Reboot required
+      ansible.builtin.set_fact:
+        reboot_required: true
+
+  post_tasks:
+    - name: Report pending reboot
+      ansible.builtin.debug:
+        msg: Kernel command line, initramfs or logind settings changed. Reboot to apply them.
+      when: reboot_required | default(false)
+      tags: [always]

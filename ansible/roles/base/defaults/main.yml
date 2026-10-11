@@ -1,0 +1,23 @@
+base_full_upgrade: true
+base_packages:
+  - sudo
+  - curl
+  - git
+  - vim
+  - htop
+  - smartmontools
+  - mdadm
+  - lvm2
+  - nfs-common
+  - open-iscsi
+  - ufw
+  - unattended-upgrades
+  - ca-certificates
+  - gnupg
+  - openssh-server
+# Reboot automatically this many seconds after a kernel panic (0 = never).
+base_kernel_panic_timeout: 10
+# Hostnames resolved to this machine in its own /etc/hosts. Other clients
+# need a *.home.lan wildcard on the router / Pi-hole.
+base_local_hostnames:
+  - "whoami.{{ domain }}"

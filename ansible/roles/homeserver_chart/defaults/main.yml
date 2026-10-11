@@ -1,0 +1,5 @@
+homeserver_chart_path: "{{ (playbook_dir ~ '/../../charts/homeserver') | realpath }}"
+homeserver_release: homeserver
+homeserver_namespace: homeserver
+# Extra values files, e.g. a gitignored secrets.yaml.
+homeserver_values_files: []

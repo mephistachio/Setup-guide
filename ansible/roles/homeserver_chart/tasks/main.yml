@@ -1,0 +1,12 @@
+# Runs as the admin user (in group sudo, which can read the kubeconfig) so
+# `helm dependency update` doesn't leave root-owned files in the repo.
+- name: Deploy the umbrella chart
+  kubernetes.core.helm:
+    name: "{{ homeserver_release }}"
+    chart_ref: "{{ homeserver_chart_path }}"
+    release_namespace: "{{ homeserver_namespace }}"
+    create_namespace: true
+    dependency_update: true
+    values_files: "{{ homeserver_values_files }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  become: false
