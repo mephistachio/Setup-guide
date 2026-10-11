@@ -1,0 +1,24 @@
+- name: Check for helm
+  ansible.builtin.stat:
+    path: /usr/local/bin/helm
+  register: helm_binary
+
+- name: Install helm
+  when: not helm_binary.stat.exists
+  block:
+    - name: Download helm installer
+      ansible.builtin.get_url:
+        url: "{{ helm_install_script }}"
+        dest: /usr/local/sbin/get-helm-3.sh
+        mode: "0755"
+
+    - name: Run helm installer
+      ansible.builtin.command: /usr/local/sbin/get-helm-3.sh
+      changed_when: true
+
+- name: Point kubectl and helm at the k3s cluster in login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/kubeconfig.sh
+    mode: "0644"
+    content: |
+      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml

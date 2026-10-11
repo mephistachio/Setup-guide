@@ -1,0 +1,74 @@
+- name: Set up the array
+  when: raid_devices | length > 0
+  block:
+    - name: Check whether the array exists
+      ansible.builtin.stat:
+        path: "{{ raid_device }}"
+      register: raid_md
+
+    - name: Refuse to create the array without confirmation
+      ansible.builtin.fail:
+        msg: >-
+          {{ raid_device }} does not exist. Creating it DESTROYS ALL DATA on
+          {{ raid_devices | join(', ') }}. Re-run with -e raid_create_confirm=true.
+      when: not raid_md.stat.exists and not raid_create_confirm | bool
+
+    - name: Create the array
+      ansible.builtin.command: >-
+        mdadm --create {{ raid_device }} --run
+        --level={{ raid_level }} --raid-devices={{ raid_devices | length }}
+        {{ raid_devices | join(' ') }}
+      when: not raid_md.stat.exists
+      changed_when: true
+
+    - name: Create filesystem
+      community.general.filesystem:
+        dev: "{{ raid_device }}"
+        fstype: ext4
+        opts: "-L {{ raid_label }}"
+
+    - name: Read filesystem UUID
+      ansible.builtin.command: blkid -s UUID -o value {{ raid_device }}
+      register: raid_uuid
+      changed_when: false
+
+    # nofail: the server must still boot and be reachable if the array is missing.
+    - name: Mount the array
+      ansible.posix.mount:
+        path: "{{ data_root }}"
+        src: "UUID={{ raid_uuid.stdout }}"
+        fstype: ext4
+        opts: defaults,nofail,x-systemd.device-timeout=30
+        passno: "2"
+        state: mounted
+
+    - name: Read array definition
+      ansible.builtin.command: mdadm --detail --brief {{ raid_device }}
+      register: raid_detail
+      changed_when: false
+
+    - name: Persist array definition
+      ansible.builtin.lineinfile:
+        path: /etc/mdadm/mdadm.conf
+        regexp: '^ARRAY {{ raid_device | regex_escape }}\s'
+        line: "{{ raid_detail.stdout }}"
+      notify: Update initramfs
+
+- name: Set mdadm alert address
+  ansible.builtin.lineinfile:
+    path: /etc/mdadm/mdadm.conf
+    regexp: '^MAILADDR\s'
+    line: "MAILADDR {{ raid_mailaddr }}"
+
+- name: Enable SMART monitoring
+  ansible.builtin.systemd_service:
+    name: smartmontools
+    enabled: true
+    state: started
+
+- name: Create data directories
+  ansible.builtin.file:
+    path: "{{ data_root }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ data_dirs }}"

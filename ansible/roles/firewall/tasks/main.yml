@@ -1,0 +1,18 @@
+- name: Allow ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ firewall_allowed_ports }}"
+
+- name: Allow k3s networks
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+  loop: "{{ firewall_allowed_networks }}"
+
+- name: Deny incoming by default and enable ufw
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    default: deny

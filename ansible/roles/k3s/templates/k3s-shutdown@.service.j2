@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# Started after k3s and, through BindsTo=, stopped before it: the node is
+# drained on every k3s stop and uncordoned on every k3s start.
+[Unit]
+Description=k3s graceful shutdown
+BindsTo=k3s.service
+After=k3s.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/bin/kubectl uncordon %i
+ExecStart=/bin/sleep inf
+ExecStop=/usr/local/bin/kubectl drain %i --ignore-daemonsets --delete-emptydir-data --timeout={{ k3s_drain_timeout }}s
+TimeoutStopSec={{ k3s_drain_timeout + 30 }}
+# The API server may not answer the uncordon right after k3s reports active.
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=k3s.service

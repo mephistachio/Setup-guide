@@ -1,0 +1,12 @@
+# Seconds until the console blanks (turns the backlight off).
+power_console_blank: 60
+# Keep USB disks from being autosuspended.
+power_usb_autosuspend_off: true
+# Disable UAS for misbehaving USB-SATA bridges: ["VVVV:PPPP:u", ...] (IDs from lsusb).
+power_usb_storage_quirks: []
+# Drop hibernation resume from swap.
+power_disable_resume: true
+# ThinkPad battery charge thresholds (applied only if the kernel exposes them).
+power_battery: BAT0
+power_battery_start_threshold: 40
+power_battery_stop_threshold: 80

@@ -1,0 +1,72 @@
+- name: Mask sleep, suspend and hibernate
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop:
+    - sleep.target
+    - suspend.target
+    - hibernate.target
+    - hybrid-sleep.target
+
+- name: Create logind drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/logind.conf.d
+    state: directory
+    mode: "0755"
+
+# Takes effect on reboot; restarting logind can end a running desktop session.
+- name: Ignore lid and power keys
+  ansible.builtin.template:
+    src: logind.conf.j2
+    dest: /etc/systemd/logind.conf.d/homeserver.conf
+    mode: "0644"
+  notify: Reboot required
+
+- name: Create grub drop-in directory
+  ansible.builtin.file:
+    path: /etc/default/grub.d
+    state: directory
+    mode: "0755"
+
+- name: Set kernel command line (console blanking, USB)
+  ansible.builtin.template:
+    src: grub.cfg.j2
+    dest: /etc/default/grub.d/homeserver.cfg
+    mode: "0644"
+  notify: Update grub
+
+- name: Remove resume= from kernel command line
+  ansible.builtin.replace:
+    path: /etc/default/grub
+    regexp: '\s*resume=\S+'
+    replace: ''
+  when: power_disable_resume
+  notify: Update grub
+
+- name: Disable resume from swap in initramfs
+  ansible.builtin.copy:
+    dest: /etc/initramfs-tools/conf.d/resume
+    content: "RESUME=none\n"
+    mode: "0644"
+  when: power_disable_resume
+  notify: Update initramfs
+
+- name: Check for battery charge threshold support
+  ansible.builtin.stat:
+    path: /sys/class/power_supply/{{ power_battery }}/charge_control_end_threshold
+  register: power_battery_thresholds
+
+- name: Set battery charge thresholds
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/battery-thresholds.conf
+    mode: "0644"
+    content: |
+      w /sys/class/power_supply/{{ power_battery }}/charge_control_start_threshold - - - - {{ power_battery_start_threshold }}
+      w /sys/class/power_supply/{{ power_battery }}/charge_control_end_threshold - - - - {{ power_battery_stop_threshold }}
+  when: power_battery_thresholds.stat.exists
+  register: power_battery_tmpfiles
+
+- name: Apply battery charge thresholds
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/battery-thresholds.conf
+  when: power_battery_tmpfiles is changed
+  changed_when: true

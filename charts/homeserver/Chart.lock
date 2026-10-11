@@ -1,0 +1,6 @@
+dependencies:
+- name: whoami
+  repository: file://charts-local/whoami
+  version: 0.1.0
+digest: sha256:4ee37caf744a1fd05f532fda70a928a943fcb88322b51364aa3cbb96a0ea3496
+generated: "2026-10-11T13:58:45.282970648+02:00"

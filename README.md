@@ -4,3 +4,4 @@ Base for a homelab server running on an old ThinkPad with a USB drive bay (up to
 
 - [docs/setup-guide.md](docs/setup-guide.md): preparing the machine, installing k3s, deploying software
 - [charts/homeserver/](charts/homeserver/): the "chart of charts" — one Helm umbrella chart that installs everything
+- [ansible/](ansible/): playbook that configures this machine as the homeserver (`ansible-playbook ansible/playbooks/site.yml -K`)

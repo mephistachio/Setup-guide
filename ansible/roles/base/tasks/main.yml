@@ -1,0 +1,43 @@
+- name: Upgrade all packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    upgrade: dist
+  when: base_full_upgrade
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ server_hostname }}"
+
+- name: Map hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1\t{{ server_hostname }}.{{ domain }} {{ server_hostname }}"
+
+- name: Resolve service hostnames locally
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s{{ item | regex_escape }}$'
+    line: "127.0.0.1\t{{ item }}"
+  loop: "{{ base_local_hostnames }}"
+
+- name: Enable unattended upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+- name: Reboot after kernel panic
+  ansible.posix.sysctl:
+    name: kernel.panic
+    value: "{{ base_kernel_panic_timeout }}"
+    sysctl_file: /etc/sysctl.d/90-panic.conf

@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT consoleblank={{ power_console_blank }}
+{%- if power_usb_autosuspend_off %} usbcore.autosuspend=-1{% endif %}
+{%- if power_usb_storage_quirks %} usb-storage.quirks={{ power_usb_storage_quirks | join(',') }}{% endif %}"

@@ -1,0 +1,18 @@
+# Machine-specific settings. Role defaults live in ansible/roles/*/defaults/main.yml.
+server_hostname: homelab
+domain: home.lan
+
+# User that gets SSH access and runs helm (the one invoking ansible-playbook).
+admin_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
+
+# RAID: list /dev/disk/by-id/... paths to build the array. Creating it destroys
+# all data on these disks, so it also requires raid_create_confirm: true
+# (pass -e raid_create_confirm=true on the command line).
+raid_devices: []
+raid_level: 5
+raid_mailaddr: root
+
+# Pinned: the installer then downloads straight from GitHub releases. Following
+# a channel needs update.k3s.io, which is unreachable from this network.
+# Releases: https://github.com/k3s-io/k3s/releases
+k3s_version: v1.36.5+k3s1
