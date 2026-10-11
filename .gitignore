@@ -1,3 +1,4 @@
 charts/homeserver/charts/
 *.tgz
 ansible/collections/
+charts/homeserver/secrets.yaml

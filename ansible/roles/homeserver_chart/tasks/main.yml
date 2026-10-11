@@ -1,5 +1,22 @@
+# Secrets (e.g. Tailscale OAuth credentials) are committed encrypted with SOPS
+# and decrypted here with the age key in ~/.config/sops/age/keys.txt, see
+# docs/secrets.md. The lookup runs on this machine as the invoking user.
+- name: Look for the encrypted secrets file
+  ansible.builtin.stat:
+    path: "{{ homeserver_secrets_file }}"
+  register: homeserver_secrets
+  become: false
+
+- name: Warn when the encrypted secrets file is missing
+  ansible.builtin.debug:
+    msg: >-
+      {{ homeserver_secrets_file }} not found. The Tailscale operator will not
+      start without OAuth credentials, see docs/secrets.md.
+  when: not homeserver_secrets.stat.exists
+
 # Runs as the admin user (in group sudo, which can read the kubeconfig) so
 # `helm dependency update` doesn't leave root-owned files in the repo.
+# no_log: the module echoes the release values, which include the secrets.
 - name: Deploy the umbrella chart
   kubernetes.core.helm:
     name: "{{ homeserver_release }}"
@@ -8,5 +25,7 @@
     create_namespace: true
     dependency_update: true
     values_files: "{{ homeserver_values_files }}"
+    values: "{{ (lookup('community.sops.sops', homeserver_secrets_file) | from_yaml) if homeserver_secrets.stat.exists else {} }}"
     kubeconfig: /etc/rancher/k3s/k3s.yaml
   become: false
+  no_log: "{{ homeserver_secrets.stat.exists }}"

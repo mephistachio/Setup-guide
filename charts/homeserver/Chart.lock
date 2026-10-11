@@ -2,5 +2,8 @@ dependencies:
 - name: whoami
   repository: file://charts-local/whoami
   version: 0.1.0
-digest: sha256:4ee37caf744a1fd05f532fda70a928a943fcb88322b51364aa3cbb96a0ea3496
-generated: "2026-10-11T13:58:45.282970648+02:00"
+- name: tailscale-operator
+  repository: https://pkgs.tailscale.com/helmcharts
+  version: 1.102.4
+digest: sha256:dd32326c99f979cad945d858232383a33135e436d0fec3336740a6c77f17d310
+generated: "2026-10-11T14:04:44.031821441+02:00"

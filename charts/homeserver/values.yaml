@@ -9,3 +9,9 @@ whoami:
   enabled: true
   ingress:
     host: whoami.home.lan
+
+# Credentials (oauth.clientId / oauth.clientSecret) belong in secrets.yaml, not here.
+tailscale-operator:
+  enabled: true
+  operatorConfig:
+    hostname: homelab-operator

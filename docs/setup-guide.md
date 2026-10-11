@@ -25,6 +25,7 @@ Settings live in [ansible/inventory/group_vars/homeserver.yml](../ansible/invent
 | `firewall` | ufw rules | 2.5 |
 | `raid` | create array (opt-in), ext4, fstab with `nofail`, mdadm.conf, alerts, smartd, data dirs | 3.2–3.5 |
 | `k3s` | config, wait-for-mount drop-in, install, graceful shutdown (`k3s-shutdown@<node>.service` drains the node before k3s stops) | 4 |
+| `sops` | `age` and `sops`, used to decrypt `charts/homeserver/secrets.enc.yaml` | 5.4 |
 | `helm` | helm binary, `KUBECONFIG` in `/etc/profile.d` | 4.1 |
 | `chart` | `helm upgrade --install homeserver` | 5.1 |
 
@@ -326,10 +327,14 @@ nextcloud:
 
 Remove software by setting `enabled: false` and upgrading. Note that PVCs usually survive removal; delete them explicitly if you want the data gone.
 
-### 5.3 Notes
+### 5.3 Remote access (Tailscale)
+
+The Tailscale operator is part of the chart and needs OAuth credentials before it starts: see [tailscale.md](tailscale.md). Secrets are committed encrypted with SOPS and age: see [secrets.md](secrets.md).
+
+### 5.4 Notes
 
 - **Namespaces.** A single release installs everything into one namespace. Charts that need cluster-wide resources (cert-manager CRDs, operators) are better installed as separate releases first. If that grows, switch to Argo CD or Flux with one Application per subchart — the umbrella pattern here maps over directly.
-- **Secrets.** Never commit plaintext secrets to `values.yaml`. Keep them in a gitignored `secrets.yaml` (`-f secrets.yaml`), or use SOPS/age or Sealed Secrets.
+- **Secrets.** Never commit plaintext secrets to `values.yaml`. They live in `charts/homeserver/secrets.enc.yaml`, encrypted with SOPS and age, see [secrets.md](secrets.md).
 - **Persistent data.** The `local-path` volumes are plain directories under `/srv/data/k3s-storage`, on the RAID. They are node-bound, which is fine for a single node.
 - **Commit `Chart.lock`.** It pins exact dependency versions; the downloaded `charts/` directory is gitignored.
 
@@ -350,4 +355,5 @@ Remove software by setting `enabled: false` and upgrading. Note that PVCs usuall
 - [ ] k3s installed with storage path on the RAID
 - [ ] DNS wildcard for `*.home.lan`
 - [ ] `helm upgrade --install homeserver` works, whoami reachable
+- [ ] Tailscale: OAuth client created, encrypted `secrets.enc.yaml` committed, age key backed up in Google Password Manager, operator visible in the admin console
 - [ ] Backups configured

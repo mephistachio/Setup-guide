@@ -14,6 +14,7 @@
     - { role: raid, tags: [raid] }
     - { role: k3s, tags: [k3s] }
     - { role: helm, tags: [helm] }
+    - { role: sops, tags: [sops, chart] }
     - { role: homeserver_chart, tags: [chart] }
 
   handlers:

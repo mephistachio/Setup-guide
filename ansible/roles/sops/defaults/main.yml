@@ -1,0 +1,4 @@
+# SOPS is not packaged for Debian; installed from GitHub releases, verified
+# against the published checksums. age comes from apt (see base_packages).
+sops_version: v3.13.3
+sops_arch: amd64

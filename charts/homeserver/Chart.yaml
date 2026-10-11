@@ -10,6 +10,13 @@ dependencies:
     repository: file://charts-local/whoami
     condition: whoami.enabled
 
+  # Exposes services to your tailnet. Needs OAuth credentials in the gitignored
+  # secrets.yaml, see docs/tailscale.md.
+  - name: tailscale-operator
+    version: 1.102.4
+    repository: https://pkgs.tailscale.com/helmcharts
+    condition: tailscale-operator.enabled
+
   # Examples of third-party charts. Uncomment, then run `helm dependency update`.
   # - name: cert-manager
   #   version: v1.16.2

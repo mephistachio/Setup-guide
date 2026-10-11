@@ -1,0 +1,6 @@
+# SOPS configuration, see docs/secrets.md.
+# Replace the recipient with the PUBLIC key printed by `age-keygen` (age1...).
+# Only secrets.yaml / secrets.enc.yaml match, so nothing else is encrypted by accident.
+creation_rules:
+  - path_regex: secrets(\.enc)?\.yaml$
+    age: age19zwf3ywp5muw3nwnhcqx09cek0t0vz5hvqfju4y279rujq5v8yvq09a5da

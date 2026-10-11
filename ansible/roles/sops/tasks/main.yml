@@ -1,0 +1,11 @@
+- name: Install age
+  ansible.builtin.apt:
+    name: age
+    cache_valid_time: 3600
+
+- name: Install sops
+  ansible.builtin.get_url:
+    url: "https://github.com/getsops/sops/releases/download/{{ sops_version }}/sops-{{ sops_version }}.linux.{{ sops_arch }}"
+    checksum: "sha256:https://github.com/getsops/sops/releases/download/{{ sops_version }}/sops-{{ sops_version }}.checksums.txt"
+    dest: /usr/local/bin/sops
+    mode: "0755"
