@@ -7,3 +7,4 @@ Base for a homelab server running on an old ThinkPad with a USB drive bay (up to
 - [ansible/](ansible/): playbook that configures this machine as the homeserver (`ansible-playbook ansible/playbooks/site.yml -K`)
 - [docs/tailscale.md](docs/tailscale.md): reaching services from anywhere with the Tailscale operator, and where to keep secrets
 - [docs/secrets.md](docs/secrets.md): committing secrets encrypted with SOPS and age
+- [docs/jellyfin.md](docs/jellyfin.md): media server, reachable over Tailscale

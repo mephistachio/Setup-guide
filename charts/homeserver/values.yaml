@@ -15,3 +15,26 @@ tailscale-operator:
   enabled: true
   operatorConfig:
     hostname: homelab-operator
+
+# Reachable only from the tailnet: https://jellyfin.<tailnet>.ts.net
+# The hostname is the first label of ingress.tls[].hosts.
+jellyfin:
+  enabled: true
+  persistence:
+    config:
+      size: 5Gi
+      storageClass: local-path   # lands on /srv/data/k3s-storage
+    media:
+      type: hostPath
+      hostPath: /srv/data/media  # created by the raid role; put your files here
+  ingress:
+    enabled: true
+    className: tailscale
+    hosts:
+      - host: jellyfin
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hosts:
+          - jellyfin
