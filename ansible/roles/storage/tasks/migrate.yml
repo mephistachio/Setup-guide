@@ -1,0 +1,21 @@
+- name: Copy {{ vol.mount }}
+  block:
+    - name: Create temporary mount point
+      ansible.builtin.file:
+        path: "/mnt/storage-{{ vol.name }}"
+        state: directory
+        mode: "0755"
+
+    - name: Mount the new volume
+      ansible.builtin.command: mount /dev/{{ storage_vg }}/{{ vol.name }} /mnt/storage-{{ vol.name }}
+      changed_when: true
+
+    - name: Copy files with permissions, hard links and xattrs
+      ansible.builtin.command: rsync -aHAX --numeric-ids {{ vol.mount }}/ /mnt/storage-{{ vol.name }}/
+      changed_when: true
+  always:
+    - name: Unmount the temporary mount point
+      ansible.builtin.command: umount /mnt/storage-{{ vol.name }}
+      register: storage_umount
+      failed_when: false
+      changed_when: storage_umount.rc == 0

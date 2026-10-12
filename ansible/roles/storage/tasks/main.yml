@@ -1,0 +1,110 @@
+- name: Select volumes
+  ansible.builtin.set_fact:
+    storage_active: >-
+      {{ storage_volumes | rejectattr('unless_raid', 'defined') | list
+         + (storage_volumes | selectattr('unless_raid', 'defined') | list
+            if raid_devices | default([]) | length == 0 else []) }}
+
+- name: Create logical volumes
+  community.general.lvol:
+    vg: "{{ storage_vg }}"
+    lv: "{{ item.name }}"
+    size: "{{ item.size }}"
+    resizefs: true
+  loop: "{{ storage_active }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Never reformats an existing filesystem.
+- name: Create filesystems
+  community.general.filesystem:
+    fstype: ext4
+    dev: "/dev/{{ storage_vg }}/{{ item.name }}"
+    opts: "-L {{ item.name }}"
+  loop: "{{ storage_active }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Check which volumes are mounted
+  ansible.builtin.command: mountpoint -q {{ item.mount }}
+  register: storage_mounted
+  failed_when: false
+  changed_when: false
+  loop: "{{ storage_active }}"
+  loop_control:
+    label: "{{ item.mount }}"
+
+- name: Select volumes still to mount
+  ansible.builtin.set_fact:
+    storage_pending: "{{ storage_mounted.results | rejectattr('rc', 'eq', 0) | map(attribute='item') | list }}"
+
+- name: Look for existing files under those mount points
+  ansible.builtin.find:
+    paths: "{{ item.mount }}"
+    file_type: any
+    hidden: true
+  register: storage_content
+  failed_when: false
+  loop: "{{ storage_pending }}"
+  loop_control:
+    label: "{{ item.mount }}"
+
+- name: Select volumes that need their files copied
+  ansible.builtin.set_fact:
+    storage_migrate: "{{ storage_content.results | selectattr('matched', 'defined') | selectattr('matched', 'gt', 0) | map(attribute='item') | list }}"
+
+- name: Look for k3s
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s-killall.sh
+  register: storage_k3s
+
+- name: Copy existing files to the new volumes
+  when: storage_migrate | length > 0
+  block:
+    # k3s holds files open under both directories (state, images, hostPath media).
+    - name: Stop k3s and its containers
+      when: storage_k3s.stat.exists
+      block:
+        - name: Stop k3s
+          ansible.builtin.systemd_service:
+            name: k3s
+            state: stopped
+        - name: Stop remaining containers
+          ansible.builtin.command: /usr/local/bin/k3s-killall.sh
+          changed_when: true
+        - name: Remember to start k3s again
+          ansible.builtin.set_fact:
+            storage_k3s_stopped: true
+
+    - name: Copy files
+      ansible.builtin.include_tasks: migrate.yml
+      loop: "{{ storage_migrate }}"
+      loop_control:
+        loop_var: vol
+        label: "{{ vol.mount }}"
+
+- name: Mount volumes
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: "/dev/{{ storage_vg }}/{{ item.name }}"
+    fstype: ext4
+    opts: "{{ item.opts }}"
+    passno: "2"
+    state: mounted
+  loop: "{{ storage_active }}"
+  loop_control:
+    label: "{{ item.mount }}"
+
+- name: Start k3s again
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: started
+  when: storage_k3s_stopped | default(false)
+
+- name: Delete the originals left under the mount points
+  ansible.builtin.include_tasks: cleanup.yml
+  loop: "{{ storage_migrate }}"
+  loop_control:
+    loop_var: vol
+    label: "{{ vol.mount }}"
+  when: storage_cleanup_old | bool

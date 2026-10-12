@@ -3,7 +3,13 @@ k3s_version: ""
 k3s_channel: stable
 # Re-run the installer even if k3s is present (upgrades to k3s_version / channel).
 k3s_upgrade: false
-k3s_storage_path: "{{ data_root | default('/srv/data') }}/k3s-storage"
+# Where local-path PersistentVolumes live: on the fast rancher volume.
+k3s_storage_path: /var/lib/rancher/k3s/storage
+# k3s refuses to start unless these are mounted, instead of creating a fresh
+# cluster on the root filesystem. /srv/data is deliberately not listed: a
+# missing data volume should not take the whole cluster down.
+k3s_required_mounts:
+  - /var/lib/rancher
 k3s_tls_san:
   - "{{ server_hostname }}"
   - "{{ server_hostname }}.{{ domain }}"

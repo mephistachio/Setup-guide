@@ -6,6 +6,21 @@
         path: "{{ raid_device }}"
       register: raid_md
 
+    - name: Check what is mounted on the data directory
+      ansible.builtin.command: findmnt -n -o SOURCE {{ data_root }}
+      register: raid_current_mount
+      failed_when: false
+      changed_when: false
+
+    - name: Refuse to mount the array over the LVM data volume
+      ansible.builtin.fail:
+        msg: >-
+          {{ data_root }} is the LVM volume {{ raid_current_mount.stdout }}. Mounting the array
+          there would hide its files and the fstab change would switch over at the next boot.
+          Follow docs/setup-guide.md 3.6: build the array at another mount point with
+          -e data_root=/srv/raid, copy, then swap.
+      when: raid_current_mount.stdout.startswith('/dev/mapper/')
+
     - name: Refuse to create the array without confirmation
       ansible.builtin.fail:
         msg: >-

@@ -18,14 +18,13 @@
     state: directory
     mode: "0755"
 
-# With nofail in fstab, k3s fails instead of starting without the data.
-- name: Make k3s wait for the data mount
+- name: Make k3s wait for its mounts
   ansible.builtin.copy:
     dest: /etc/systemd/system/k3s.service.d/wait-for-data.conf
     mode: "0644"
     content: |
       [Unit]
-      RequiresMountsFor={{ data_root | default('/srv/data') }}
+      RequiresMountsFor={{ k3s_required_mounts | join(' ') }}
   register: k3s_dropin
 
 - name: Check for k3s
@@ -55,6 +54,12 @@
     state: restarted
     daemon_reload: true
   when: (k3s_config is changed or k3s_dropin is changed) and k3s_install is skipped
+
+- name: Make sure k3s is running
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: started
+    enabled: true
 
 - name: Wait for the node to be Ready
   ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s

@@ -1,0 +1,23 @@
+# A non-recursive bind mount of / shows the root filesystem without the volumes
+# mounted on top of it, so this deletes only the stale originals.
+- name: Delete originals of {{ vol.mount }}
+  block:
+    - name: Create temporary mount point
+      ansible.builtin.file:
+        path: /mnt/storage-rootview
+        state: directory
+        mode: "0755"
+
+    - name: Bind mount the root filesystem
+      ansible.builtin.command: mount --bind / /mnt/storage-rootview
+      changed_when: true
+
+    - name: Delete the files
+      ansible.builtin.command: find /mnt/storage-rootview{{ vol.mount }} -mindepth 1 -delete
+      changed_when: true
+  always:
+    - name: Unmount the root view
+      ansible.builtin.command: umount /mnt/storage-rootview
+      register: storage_rootview
+      failed_when: false
+      changed_when: storage_rootview.rc == 0

@@ -8,6 +8,5 @@ raid_label: data
 raid_mailaddr: root
 data_root: /srv/data
 data_dirs:
-  - k3s-storage
   - backups
   - media

@@ -16,3 +16,8 @@ raid_mailaddr: root
 # a channel needs update.k3s.io, which is unreachable from this network.
 # Releases: https://github.com/k3s-io/k3s/releases
 k3s_version: v1.36.5+k3s1
+
+# Disk layout, see docs/setup-guide.md 2.6. LVM volume group on the system disk.
+storage_vg: homelab-vg
+# Large-file storage. An LVM volume until raid_devices is set, then the RAID.
+data_root: /srv/data

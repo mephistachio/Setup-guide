@@ -20,6 +20,7 @@ Settings live in [ansible/inventory/group_vars/homeserver.yml](../ansible/invent
 | Tag | Role | Guide section |
 |---|---|---|
 | `base` | packages, hostname, `/etc/hosts`, unattended-upgrades, panic reboot | 2, 2.2, 2.3, 4.2 (local only) |
+| `storage` | LVM volumes `rancher` (`/var/lib/rancher`) and `data` (`/srv/data`), copies existing files over | 2.6, 3.5 |
 | `power` | mask sleep, logind lid/keys, kernel cmdline (`consoleblank`, USB autosuspend, UAS quirks), no resume, battery thresholds | 1 (thresholds), 2.1, 3.1 |
 | `ssh` | no password or root login over SSH | 2.4 |
 | `firewall` | ufw rules | 2.5 |
@@ -135,6 +136,31 @@ ufw allow from 10.43.0.0/16 to any   # services
 ufw enable
 ```
 
+### 2.6 Disk layout (LVM)
+
+The system disk's volume group (`homelab-vg`) carries two extra volumes, so that neither k3s nor bulk data can fill the root filesystem. When root runs low (the kubelet's default is under 15% free) the node gets `DiskPressure`, evicts **every** pod and refuses new ones.
+
+| Volume | Mount | Holds | Later |
+|---|---|---|---|
+| `rancher` (30G, growable) | `/var/lib/rancher` | k3s state and database, container images, **local-path PersistentVolumes** (`/var/lib/rancher/k3s/storage`): app configs and databases | stays |
+| `data` (300G) | `/srv/data` | large files: `media/`, `backups/` | replaced by the RAID, 3.6 |
+
+Run `ansible-playbook ansible/playbooks/site.yml -K --tags storage`. On a machine that already has files in those directories (an existing k3s), the role stops k3s, copies the files to the new volume with `rsync`, mounts it over the directory and starts k3s again. The originals stay on the root filesystem underneath the mount, so **free space on root does not come back** until you delete them: add `-e storage_cleanup_old=true` to do it automatically after a successful copy.
+
+Grow a volume later by raising `size` in `storage_volumes` and re-running; the filesystem is resized online. Check `vgs` for free space.
+
+Manual equivalent for `/var/lib/rancher`:
+
+```sh
+lvcreate -L 30G -n rancher homelab-vg && mkfs.ext4 -L rancher /dev/homelab-vg/rancher
+systemctl stop k3s && k3s-killall.sh
+mount /dev/homelab-vg/rancher /mnt && rsync -aHAX --numeric-ids /var/lib/rancher/ /mnt/ && umount /mnt
+echo '/dev/homelab-vg/rancher /var/lib/rancher ext4 defaults 0 2' >> /etc/fstab
+mount /var/lib/rancher && findmnt /var/lib/rancher     # must show the volume before starting k3s
+systemctl start k3s
+# afterwards reclaim the space under the mount: mount --bind / /mnt && rm -rf /mnt/var/lib/rancher/* && umount /mnt
+```
+
 ## 3. The USB RAID array
 
 ### 3.1 Caveats of RAID over USB
@@ -208,10 +234,21 @@ mdadm /dev/md0 --add /dev/disk/by-id/usb-NEW
 ### 3.5 Directory layout
 
 ```sh
-mkdir -p /srv/data/{k3s-storage,backups,media}
+mkdir -p /srv/data/{backups,media}
 ```
 
-`k3s-storage` will hold all Kubernetes persistent volumes.
+`media` is mounted into Jellyfin, `backups` is for restic/borg. Kubernetes persistent volumes are **not** here: they live on the fast `rancher` volume (section 2.6).
+
+### 3.6 Moving /srv/data from the LVM volume to the RAID
+
+The `raid` role refuses to mount the array over the LVM volume (it would hide the files, and the fstab swap would take effect at the next boot). Instead:
+
+1. Build the array at a temporary mount point: set `raid_devices`, then `ansible-playbook ansible/playbooks/site.yml -K --tags raid -e data_root=/srv/raid -e raid_create_confirm=true`.
+2. Stop k3s (`systemctl stop k3s && k3s-killall.sh`) and copy: `rsync -aHAX --numeric-ids /srv/data/ /srv/raid/`.
+3. In `/etc/fstab` delete the `/dev/homelab-vg/data` line and change the RAID line's mount point from `/srv/raid` to `/srv/data`; then `umount /srv/data /srv/raid && mount /srv/data`.
+4. Start k3s, check Jellyfin, then `lvremove homelab-vg/data` to free the space.
+
+After that `raid_devices` stays set, so the `storage` role no longer creates the `data` volume, and the `raid` role mounts the array at `/srv/data` as usual.
 
 ## 4. Install k3s
 
@@ -224,7 +261,7 @@ mkdir -p /etc/rancher/k3s
 cat > /etc/rancher/k3s/config.yaml <<'CONF'
 write-kubeconfig-mode: "0640"
 write-kubeconfig-group: "sudo"
-default-local-storage-path: /srv/data/k3s-storage
+default-local-storage-path: /var/lib/rancher/k3s/storage
 tls-san:
   - homeserver
   - homeserver.home.lan
@@ -245,18 +282,18 @@ kubectl get nodes          # Ready
 kubectl get pods -A        # traefik, coredns, local-path-provisioner Running
 ```
 
-If the RAID is mounted late, make k3s wait for it so volumes aren't created on the root disk:
+Make k3s wait for its volume, so it never starts with an empty `/var/lib/rancher` and creates a fresh cluster on the root disk:
 
 ```sh
 mkdir -p /etc/systemd/system/k3s.service.d
 cat > /etc/systemd/system/k3s.service.d/wait-for-data.conf <<'CONF'
 [Unit]
-RequiresMountsFor=/srv/data
+RequiresMountsFor=/var/lib/rancher
 CONF
 systemctl daemon-reload
 ```
 
-(With `nofail` in fstab, `RequiresMountsFor` makes k3s fail rather than start without the data — which is what you want.)
+(`/srv/data` is deliberately not listed: if the large-file volume is missing, only Jellyfin should fail, not the whole cluster.)
 
 ### 4.1 Tools on your workstation
 
@@ -335,7 +372,7 @@ The Tailscale operator is part of the chart and needs OAuth credentials before i
 
 - **Namespaces.** A single release installs everything into one namespace. Charts that need cluster-wide resources (cert-manager CRDs, operators) are better installed as separate releases first. If that grows, switch to Argo CD or Flux with one Application per subchart — the umbrella pattern here maps over directly.
 - **Secrets.** Never commit plaintext secrets to `values.yaml`. They live in `charts/homeserver/secrets.enc.yaml`, encrypted with SOPS and age, see [secrets.md](secrets.md).
-- **Persistent data.** The `local-path` volumes are plain directories under `/srv/data/k3s-storage`, on the RAID. They are node-bound, which is fine for a single node.
+- **Persistent data.** The `local-path` volumes are plain directories under `/var/lib/rancher/k3s/storage`, on the fast `rancher` volume. Back that directory up too (section 6). They are node-bound, which is fine for a single node.
 - **Commit `Chart.lock`.** It pins exact dependency versions; the downloaded `charts/` directory is gitignored.
 
 ## 6. Backups and maintenance
@@ -351,8 +388,9 @@ The Tailscale operator is part of the chart and needs OAuth credentials before i
 - [ ] Power loss test passed
 - [ ] Sleep/hibernate masked, lid ignored
 - [ ] Static IP / DHCP reservation, SSH keys only
-- [ ] RAID created, in fstab with `nofail`, mdadm monitoring on
-- [ ] k3s installed with storage path on the RAID
+- [ ] LVM volumes `rancher` and `data` mounted, root filesystem has free space
+- [ ] RAID created, in fstab with `nofail`, mdadm monitoring on, `/srv/data` moved to it (3.6)
+- [ ] k3s installed with state and volumes on the `rancher` volume
 - [ ] DNS wildcard for `*.home.lan`
 - [ ] `helm upgrade --install homeserver` works, whoami reachable
 - [ ] Tailscale: OAuth client created, encrypted `secrets.enc.yaml` committed, age key backed up in Google Password Manager, operator visible in the admin console

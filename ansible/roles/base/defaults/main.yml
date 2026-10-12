@@ -8,6 +8,7 @@ base_packages:
   - smartmontools
   - mdadm
   - lvm2
+  - rsync
   - nfs-common
   - open-iscsi
   - ufw

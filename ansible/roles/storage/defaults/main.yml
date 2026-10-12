@@ -1,0 +1,21 @@
+# Two LVM volumes on the system disk, so k3s and bulk data cannot fill the root
+# filesystem (the kubelet evicts every pod once it runs low on space):
+#   rancher  fast storage: k3s state, container images and the default PVs
+#   data     large files (media, backups). Replaced by the RAID once raid_devices
+#            is set, see docs/setup-guide.md 3.6.
+storage_vg: homelab-vg
+storage_volumes:
+  - name: rancher
+    size: 30G
+    mount: /var/lib/rancher
+    opts: defaults
+  - name: data
+    size: 300G
+    mount: "{{ data_root }}"
+    opts: defaults,nofail,x-systemd.device-timeout=30
+    unless_raid: true
+# A volume mounted over a directory that already has files first receives a copy
+# of them; the originals stay on the root filesystem underneath the mount until
+# deleted. Set true (-e storage_cleanup_old=true) to delete them after a
+# successful copy and mount, which frees the space on root.
+storage_cleanup_old: false
